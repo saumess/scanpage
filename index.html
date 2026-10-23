@@ -35,7 +35,10 @@ input,button{font-size:18px;padding:10px;margin:6px 0;width:100%;box-sizing:bord
 .line{font-size:18px;margin-top:4px}
 .due{font-size:30px;font-weight:800;margin-top:10px}
 .meal{font-size:14px;letter-spacing:2px;opacity:.85;margin-top:2px}
-.next{margin-top:18px;font-size:14px;opacity:.8}
+.nextbtn{position:sticky;bottom:12px;width:100%;max-width:420px;margin-top:20px;padding:16px;font-size:20px;font-weight:800;letter-spacing:1px;border:0;border-radius:14px;background:#fff;color:#111;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+#ov.DUPE .nextbtn{background:#222;color:#fff}
+.photo{transition:opacity .3s;opacity:.35}
+.photo.loaded{opacity:1}
 </style></head><body>
 
 <div id='login' class='box'>
@@ -60,7 +63,7 @@ input,button{font-size:18px;padding:10px;margin:6px 0;width:100%;box-sizing:bord
     <input id='roll' placeholder='Mess card no (card bhool gaya)'>
     <button onclick='manual()'>Search</button>
   </div>
-  <div id='ov' onclick='closeResult()'></div>
+  <div id='ov'></div>
 </div>
 
 <script src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js'></script>
@@ -69,7 +72,7 @@ input,button{font-size:18px;padding:10px;margin:6px 0;width:100%;box-sizing:bord
 const sb = supabase.createClient('https://vcnaltvzdkgovhhkbzbq.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZjbmFsdHZ6ZGtnb3ZoaGtiemJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3MjI1MDAsImV4cCI6MjEwODI5ODUwMH0.4kyj7jjIAmUT5XAELnt9LqG3AXe968DMSQ3MS1V-fKU');
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-let busy = false, scanner = null, closeTimer = null, actx = null;
+let busy = false, scanner = null, actx = null;
 
 function unlock() {
   try {
@@ -139,25 +142,23 @@ async function call(key, byCard) {
     if (error) throw error;
     await show(data);
   } catch (e) {
-    overlay('ERR', `<div class='big'>ERROR</div><div class='line'>${esc(e.message || e)}</div>`, false, 4000);
+    overlay('ERR', `<div class='big'>ERROR</div><div class='line'>${esc(e.message || e)}</div>`, false);
   }
 }
 
-function overlay(cls, html, ok, ms) {
+function overlay(cls, html, ok) {
   const ov = $('ov');
   ov.className = cls;
-  ov.innerHTML = html + `<div class='next'>Tap karo ya agla scan</div>`;
+  ov.innerHTML = html + `<button class='nextbtn' onclick='closeResult()'>NEXT SCAN</button>`;
   ov.style.display = 'flex';
+  ov.scrollTop = 0;
   beep(ok);
   if (navigator.vibrate) navigator.vibrate(ok ? 80 : [200, 100, 200]);
-  clearTimeout(closeTimer);
-  closeTimer = setTimeout(closeResult, ms || 8000);
 }
 
 function closeResult() {
-  clearTimeout(closeTimer);
   $('ov').style.display = 'none';
-  setTimeout(() => { busy = false; }, 500);
+  setTimeout(() => { busy = false; }, 400);
 }
 
 async function show(r) {
@@ -190,7 +191,11 @@ async function show(r) {
   overlay(cls, html, r.result === 'PAID' && !r.already_scanned);
   if (r.photo_file) {
     const { data } = await sb.storage.from('photos').createSignedUrl(r.photo_file, 60);
-    if (data && data.signedUrl) $('ph').src = data.signedUrl;
+    if (data && data.signedUrl) {
+      const img = $('ph');
+      img.onload = () => img.classList.add('loaded');
+      img.src = data.signedUrl;
+    }
   }
 }
 
