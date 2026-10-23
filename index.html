@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang='en'><head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>Mess Scan</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:0;background:#111;color:#fff;text-align:center}
+.box{padding:12px;max-width:480px;margin:auto}
+input,button{font-size:18px;padding:10px;margin:6px 0;width:100%;box-sizing:border-box}
+#result{display:none;padding:12px;border-radius:12px;margin-top:10px}
+#result img{width:160px;height:210px;object-fit:cover;border-radius:8px}
+.PAID{background:#1b8a3a}.DUE{background:#c62828}
+.BLOCKED,.NOT_FOUND{background:#000;border:3px solid #c62828}
+.warn{background:#f9a825;color:#000;padding:8px;border-radius:8px;margin:8px 0;font-weight:bold}
+#st{font-size:40px;font-weight:bold}
+</style></head><body>
+<div id='login' class='box'>
+  <h2>Mess Login</h2>
+  <input id='em' placeholder='Email'>
+  <input id='pw' type='password' placeholder='Password'>
+  <button onclick='login()'>Login</button>
+  <div id='err'></div>
+</div>
+<div id='app' class='box' style='display:none'>
+  <div id='reader'></div>
+  <input id='roll' placeholder='Roll no (card bhool gaya)'>
+  <button onclick='manual()'>Search by roll no</button>
+  <div id='result'></div>
+  <button onclick='logout()'>Logout</button>
+</div>
+<script src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js'></script>
+<script>
+const sb = supabase.createClient('SUPABASE_URL', 'ANON_KEY');
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+let busy = false, scanner = null;
+
+async function login() {
+  const { error } = await sb.auth.signInWithPassword({ email: $('em').value.trim(), password: $('pw').value });
+  if (error) { $('err').textContent = 'Login failed'; return; }
+  start();
+}
+async function logout() {
+  if (scanner) { try { await scanner.stop(); } catch (e) {} }
+  await sb.auth.signOut(); location.hash = ''; location.reload();
+}
+async function start() {
+  $('login').style.display = 'none'; $('app').style.display = 'block';
+  scanner = new Html5Qrcode('reader');
+  scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: 240 }, onScan).catch(e => alert('Camera error: ' + e));
+  if (location.hash.startsWith('#t=')) { const t = location.hash.slice(3); history.replaceState(null, '', location.pathname); call(t, false); }
+}
+function onScan(text) {
+  const key = text.includes('#t=') ? text.split('#t=')[1] : text;
+  call(key, false);
+}
+function manual() { const r = $('roll').value.trim(); if (r) call(r, true); }
+
+async function call(key, byRoll) {
+  if (busy) return; busy = true;
+  try {
+    const { data, error } = await sb.rpc('scan_card', { p_key: key, p_by_roll: byRoll });
+    if (error) throw error;
+    await show(data);
+    if (navigator.vibrate) navigator.vibrate(data.result === 'PAID' ? 80 : [200, 100, 200]);
+  } catch (e) {
+    $('result').style.display = 'block'; $('result').className = 'DUE';
+    $('result').textContent = 'Error: ' + (e.message || e);
+  }
+  setTimeout(() => { busy = false; }, 2500);
+}
+
+async function show(r) {
+  const el = $('result'); el.style.display = 'block'; el.className = r.result;
+  if (r.result === 'NOT_FOUND') { el.innerHTML = "<div id='st'>NOT FOUND</div>"; return; }
+  let url = '';
+  if (r.photo_file) {
+    const { data } = await sb.storage.from('photos').createSignedUrl(r.photo_file, 60);
+    url = (data && data.signedUrl) || '';
+  }
+  const t = r.prev_time ? new Date(r.prev_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '';
+  el.innerHTML = `<div id='st'>${esc(r.result)}</div>`
+    + (r.already_scanned ? `<div class='warn'>ALREADY SCANNED (${esc(r.meal)}) at ${t}</div>` : '')
+    + `<img src='${url}'><h2>${esc(r.name)}</h2>`
+    + `<div>Roll: ${esc(r.roll_no)} | Card: ${esc(r.mess_card_no)}</div>`
+    + `<div>Paid upto: ${esc(r.paid_upto || '-')}</div><div>Due: ₹${esc(r.due_amount)}</div>`;
+}
+
+sb.auth.getSession().then(({ data }) => { if (data.session) start(); });
+</script></body></html>
