@@ -30,7 +30,7 @@ input,button{font-size:18px;padding:10px;margin:6px 0;width:100%;box-sizing:bord
 <script src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js'></script>
 <script src='https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js'></script>
 <script>
-const sb = supabase.createClient('SUPABASE_URL', 'ANON_KEY');
+const sb = supabase.createClient('https://vcnaltvzdkgovhhkbzbq.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZjbmFsdHZ6ZGtnb3ZoaGtiemJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3MjI1MDAsImV4cCI6MjEwODI5ODUwMH0.4kyj7jjIAmUT5XAELnt9LqG3AXe968DMSQ3MS1V-fKU');
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 let busy = false, scanner = null;
